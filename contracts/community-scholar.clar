@@ -83,3 +83,52 @@
     (ok new-id)
   )
 )
+
+;; Function to check IP ownership
+(define-read-only (check-ip-ownership (ip-id uint))
+  (let ((ip-data (map-get? ip-registrations { ip-id: ip-id })))
+    (if (is-some ip-data)
+      (ok (get owner (unwrap-panic ip-data)))
+
+      ERR-IP-NOT-FOUND
+    )
+  )
+)
+
+;; Function to verify IP hash
+(define-read-only (verify-ip-hash
+    (ip-id uint)
+    (hash-to-verify (buff 32))
+  )
+  (let ((ip-data (map-get? ip-registrations { ip-id: ip-id })))
+    (if (is-some ip-data)
+      (ok (is-eq (get hash (unwrap-panic ip-data)) hash-to-verify))
+      ERR-IP-NOT-FOUND
+    )
+  )
+)
+
+;; Function to transfer IP ownership
+(define-public (transfer-ip
+    (ip-id uint)
+    (new-owner principal)
+  )
+  (let ((current-ip-counter (var-get ip-counter)))
+    ;; Perform input validation
+    (asserts! (<= ip-id current-ip-counter) ERR-IP-ID-OUT-OF-RANGE)
+    (asserts! (> ip-id u0) ERR-INVALID-IP-ID)
+
+    (let ((ip-data (map-get? ip-registrations { ip-id: ip-id })))
+      (asserts! (is-some ip-data) ERR-IP-NOT-FOUND)
+      (let ((unwrapped-ip-data (unwrap-panic ip-data)))
+        (asserts! (is-eq tx-sender (get owner unwrapped-ip-data))
+          ERR-NOT-AUTHORIZED
+        )
+        (map-set ip-registrations { ip-id: ip-id }
+          (merge unwrapped-ip-data { owner: new-owner })
+        )
+        (ok true)
+      )
+    )
+  )
+)
