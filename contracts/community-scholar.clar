@@ -132,3 +132,52 @@
     )
   )
 )
+
+;; Function to check if a hash is already registered
+(define-read-only (is-hash-registered (ip-hash (buff 32)))
+  (is-some (map-get? registered-hashes { hash: ip-hash }))
+)
+
+;; Smart Contract on Intellectual Property Protection with Expiration Date, Corrected Safety Checks, IP Update Functionality, Owner Verification, and Corrected Expiration Extension
+
+;; function to extend IP registration
+(define-public (extend-ip-registration
+    (ip-id uint)
+    (new-expiration uint)
+  )
+  (let (
+      (current-ip-counter (var-get ip-counter))
+      (current-block stacks-block-height)
+    )
+    ;; Perform input validation
+    (asserts! (<= ip-id current-ip-counter) ERR-IP-ID-OUT-OF-RANGE)
+    (asserts! (> ip-id u0) ERR-INVALID-IP-ID)
+    (asserts! (> new-expiration current-block) ERR-INVALID-EXPIRATION)
+
+    (let ((ip-data (map-get? ip-registrations { ip-id: ip-id })))
+      (asserts! (is-some ip-data) ERR-IP-NOT-FOUND)
+      (let ((unwrapped-ip-data (unwrap-panic ip-data)))
+        (asserts! (is-eq tx-sender (get owner unwrapped-ip-data))
+          ERR-NOT-AUTHORIZED
+        )
+        (match (get expiration unwrapped-ip-data)
+          current-expiration (if (> new-expiration current-expiration)
+            (begin
+              (map-set ip-registrations { ip-id: ip-id }
+                (merge unwrapped-ip-data { expiration: (some new-expiration) })
+              )
+              (ok true)
+            )
+            ERR-INVALID-EXPIRATION
+          )
+          (begin
+            (map-set ip-registrations { ip-id: ip-id }
+              (merge unwrapped-ip-data { expiration: (some new-expiration) })
+            )
+            (ok true)
+          )
+        )
+      )
+    )
+  )
+)
